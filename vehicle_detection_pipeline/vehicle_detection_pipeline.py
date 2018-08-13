@@ -110,14 +110,15 @@ def extract_featurres_from_img_list(img_list, cspace='RGB2YCrCb',
         hog_features = get_hog_features(img, orient, pix_per_cell, cell_per_block,
                         vis=False, feature_vec=True, hog_channel=3)
         hog_features = np.hstack((hog_features[0].ravel(), hog_features[1].ravel(), hog_features[2].ravel()))
-        full_features = np.hstack((bin_spatial_feature, color_hist_feature, hog_features)).reshape(-1, 1)
+        #print(hog_features.shape)
+        full_features = np.hstack((bin_spatial_feature, color_hist_feature, hog_features)).reshape(1, -1)
         #feature_list.append(np.concatenate((bin_spatial_feature, color_hist_feature)))
         feature_list.append(full_features)
     return feature_list
 
 def get_scaler_from_feature_vectors (feature_vectors):
     #X = np.vstack(feature_vectors).astype(np.float64)
-    X_scaler = StandardScaler().fit(X)
+    X_scaler = StandardScaler().fit(feature_vectors)
     return X_scaler
 
 
@@ -175,15 +176,18 @@ def slide_windows_and_update_heat_map(img, ystart,
             feat3 = hog_features[2][ypos:ypos+nblocks_per_window, xpos:xpos+nblocks_per_window]
             #print(feat1.shape, feat2.shape, feat3.shape)
             hog_feats = np.hstack((feat1.ravel(), feat2.ravel(), feat3.ravel()))
+            #print("hog shapes:",hog_feats.shape)
             # extract color features from the corresponding windows
             xleft = xpos * pix_per_cell
             ytop = ypos * pix_per_cell
             sub_img = cv2.resize(img_to_search[ytop:ytop+window_size, xleft:xleft+window_size],(window_size, window_size))
             spatial_features = bin_spatial(sub_img, size=spatial_size)
-            hist_features = color_hist(sub_img, num_bins=32, bins_range=(0, 256))
+            hist_features = color_hist(sub_img, num_bins=hist_bins, bins_range=(0, 256))
             # combine all features
             #print (spatial_features.shape, hist_features.shape, hog_feats.shape)
-            all_features = X_scaler.transform(np.hstack((spatial_features, hist_features, hog_feats)).reshape(1, -1))
+            features_to_scale = np.hstack((spatial_features, hist_features, hog_feats)).reshape(1, -1)
+            #print("features to scale", features_to_scale.shape)
+            all_features = X_scaler.transform(features_to_scale)
             prediction = svc.predict(all_features)
             if prediction == 1:
                 window_draw = np.int(window_size * scale)
@@ -195,7 +199,7 @@ def slide_windows_and_update_heat_map(img, ystart,
                 y2 = y_draw+window_draw+ystart
                 bboxes.append(((x1, y1),(x2, y2)))
                 #print(x1,x2,y1,y2)
-                heat_map[x1:x2, y1:y2] += 1
+                heat_map[y1:y2, x1:x2] += 1
     # apply threshold for heat map here
     #heat_map[heat_map <= threshold] = 0
     labels = label(heat_map)
@@ -207,7 +211,7 @@ def draw_bounding_boxes_from_labels(img, labels):
         nonzero_idx = (labels[0] == car_idx).nonzero()
         nonzeroy = np.array(nonzero_idx[0])
         nonzerox = np.array(nonzero_idx[1])
-        bbox = ((np.min(nonzerox), np.min(nonzeroy)),(np.max(nonzerox), np.max(nonzeroy)))
-        print("Box1 ", bbox)
+        bbox = ((np.min(nonzeroy),np.min(nonzerox)),( np.max(nonzeroy), np.max(nonzerox)))
+        print("Box ", bbox)
         cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
     return img
