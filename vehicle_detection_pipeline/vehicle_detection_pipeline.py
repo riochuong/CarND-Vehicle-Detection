@@ -103,8 +103,9 @@ def extract_featurres_from_img_list(img_list, cspace='RGB2YCrCb',
                                    ):
     feature_list = []
     for img_path in img_list:
-        img = mpimg.imread(img_path)
+        img = cv2.imread(img_path)
         img = convert_color(img, conv=cspace)
+        img = img.astype(np.float32)/255.0
         bin_spatial_feature = bin_spatial(img, spatial_size)
         color_hist_feature = color_hist(img, num_bins=hist_bins)
         hog_features = get_hog_features(img, orient, pix_per_cell, cell_per_block,
@@ -136,7 +137,7 @@ def slide_windows_and_update_heat_map(img, ystart,
                                           ):
     # using cv2 to read img in so normalize it here
     img = np.copy(img)
-    img = img.astype(np.float32)/255
+    img = img.astype(np.float32)/255.0
 
     # select interest area
     img_to_search = img[ystart:ystop,:,:]
