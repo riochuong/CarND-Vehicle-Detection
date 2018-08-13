@@ -201,9 +201,13 @@ def slide_windows_and_update_heat_map(img, ystart,
                 #print(x1,x2,y1,y2)
                 heat_map[y1:y2, x1:x2] += 1
     # apply threshold for heat map here
-    #heat_map[heat_map <= threshold] = 0
+    heat_map[heat_map <= threshold] = 0
     labels = label(heat_map)
     return heat_map, labels
+
+def apply_heat_map_threshold(heat_map, threshold):
+    assert(heat_map is not None)
+    heat_map[heat_map <= threshold] = 0
 
 def draw_bounding_boxes_from_labels(img, labels):
     # draw bounding boxes based on label
@@ -211,7 +215,7 @@ def draw_bounding_boxes_from_labels(img, labels):
         nonzero_idx = (labels[0] == car_idx).nonzero()
         nonzeroy = np.array(nonzero_idx[0])
         nonzerox = np.array(nonzero_idx[1])
-        bbox = ((np.min(nonzeroy),np.min(nonzerox)),( np.max(nonzeroy), np.max(nonzerox)))
+        bbox = ((np.min(nonzerox),np.min(nonzeroy)),( np.max(nonzerox), np.max(nonzeroy)))
         print("Box ", bbox)
-        cv2.rectangle(img, bbox[0], bbox[1], (0,0,255), 6)
+        cv2.rectangle(img, bbox[0], bbox[1], (0,255,0), 10)
     return img
