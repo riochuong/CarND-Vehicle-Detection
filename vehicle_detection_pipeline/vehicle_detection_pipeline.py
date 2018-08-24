@@ -93,7 +93,7 @@ def bin_spatial(img, size=(32,32)):
     features = cv2.resize(img, size).ravel()
     return features
 
-def extract_featurres_from_img_list(img_list, cspace='RGB2YCrCb',
+def extract_featurres_from_img_list(img_list, cspace='BGR2YCrCb',
                                     spatial_size=(32,32),
                                     hist_bins=32,
                                     hist_range=(0,256),
