@@ -146,7 +146,7 @@ def slide_windows_and_update_heat_map(img, ystart,
         img_to_search = cv2.resize(img_to_search, (np.int(imshape[1]/scale), np.int(imshape[0]/scale)))
 
     # convert to correct color space
-    img_to_search = convert_color(img_to_search, conv='RGB2YCrCb')
+    img_to_search = convert_color(img_to_search, conv='BGR2YCrCb')
     # caclculate number of blocks and steps
     nxblocks = (img_to_search.shape[1] // pix_per_cell) - cell_per_block + 1
     nyblocks = (img_to_search.shape[0] // pix_per_cell) - cell_per_block + 1
