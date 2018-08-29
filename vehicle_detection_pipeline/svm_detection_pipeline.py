@@ -1,4 +1,4 @@
-from vehicle_detection_pipeline import *
+from vehicle_detection_utils import *
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -12,8 +12,8 @@ class VehicleDetectionPipeline(object):
                  orient=9, pix_per_cell=8,
                  cell_per_block=2,
                  hist_bins=32,
-                 cell_per_step=1,
-                 threshold=7,
+                 cell_per_step=2,
+                 threshold=4.5,
                  spatial_size=(32,32)):
         self.svc_model = None
         self.scaler = None
@@ -25,7 +25,7 @@ class VehicleDetectionPipeline(object):
             self.scaler = pickle.load(f)
         self.heat_map = None
         self.heat_map_queue = []
-        self.scales = [2, 3, 4]
+        self.scales = [(1,400,464),(1,410,474),(1.5,420,516),(1.5,400,496),(2,400,528)] # scale, ystart, ystop
         self.orient = orient
         self.pix_per_cell = pix_per_cell
         self.cell_per_block = cell_per_block
@@ -33,11 +33,14 @@ class VehicleDetectionPipeline(object):
         self.cell_per_step = cell_per_step
         self.threshold = threshold
         self.spatial_size = spatial_size
-        self.queue_max_size = 7
+        self.queue_max_size = 10
+        self.track_heat_map = None
 
     def get_average_heat_map_queue(self):
-        if len(self.heat_map_queue) > 0:
+        if len(self.heat_map_queue) == self.queue_max_size:
             return np.average(np.array(self.heat_map_queue), axis=0)
+            #return np.sum(np.array(self.heat_map_queue), axis=0)
+        return None
 
     def add_heat_map_to_queue(self, heat_map):
         if len(self.heat_map_queue) == self.queue_max_size:
@@ -56,22 +59,28 @@ class VehicleDetectionPipeline(object):
             codec = cv2.VideoWriter_fourcc(*'MJPG')
             out = cv2.VideoWriter('output.avi', codec, 20.0, (1280, 720))
         count = 0
+        frame_count = 0
+        skip = 0
         while cap.isOpened():
+            frame_count += 1
             ret, orig_frame = cap.read()
+            if frame_count < skip:
+                continue
             # if frame is valid then run it through the pipe line
             if not ret:
                 break
             # run sliding windows on the interest area of each frame
             if self.heat_map is None:
                 self.heat_map = np.zeros((orig_frame.shape[0], orig_frame.shape[1]))
-            print(orig_frame.shape)
-            ystart = orig_frame.shape[0] // 2
-            ystop = orig_frame.shape[0] - 200
-            print(ystart, ystop)
+            #ystart = 380
+            #ystop = 620
             labels = None
             heat_map = np.zeros((orig_frame.shape[0], orig_frame.shape[1]))
-            for scale in self.scales:
-                heat_map = slide_windows_and_update_heat_map(orig_frame,
+            #print("Good Y Range: %d %d" % (orig_frame.shape[0]//2, orig_frame.shape[0]-100))
+            for i, (scale, ystart, ystop) in enumerate(self.scales):
+                print(ystart, ystop)
+                #heat_map = np.zeros((orig_frame.shape[0], orig_frame.shape[1]))
+                heat_map, test_img = slide_windows_and_update_heat_map(orig_frame,
                                                       ystart,
                                                       ystop,
                                                       scale,
@@ -86,29 +95,65 @@ class VehicleDetectionPipeline(object):
                                                       cells_per_step=self.cell_per_step,
                                                       threshold=self.threshold,
                                                       heat_map=heat_map)
-            #assert(labels is not None)
-            #self.get_heat_map_avg(heat_map, count)
+            #heat_map[heat_map <= (self.threshold)] = 0
+            #heat_map[~(heat_map <= (self.threshold))] = 1.0
             self.add_heat_map_to_queue(heat_map)
+            #assert(labels is not None)
+            #self.get_heat_map_avg(heat_map, count
+#             if self.heat_map is not None and (len(self.heat_map_queue) == self.queue_max_size):
+#                 self.heat_map = np.average(np.array([self.heat_map, self.get_average_heat_map_queue()]), axis=0)
+#             else:
             self.heat_map = self.get_average_heat_map_queue()
-            self.heat_map[heat_map <= self.threshold] = 0
-            labels = label(self.heat_map)
-            draw_bounding_boxes_from_labels(orig_frame, labels)
+            if self.track_heat_map is None:
+                self.track_heat_map = np.zeros((orig_frame.shape[0], orig_frame.shape[1]))
+            cv2.line(test_img, (0,400), (test_img.shape[1],400),(255,0,0),5)
+            cv2.line(test_img, (0,600), (test_img.shape[1],600),(0,255,0),5)
+            if self.heat_map is not None:
+                print ("heat map val: ",np.max(self.heat_map))
+                if debug:
+                    cv2.imshow('heatmap', self.heat_map)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+                self.heat_map[self.heat_map < self.threshold] = 0
+                #self.track_heat_map[self.heat_map > 0] += 1
+                #self.track_heat_map[self.heat_map == 0] -= 1
+                #self.track_heat_map[self.track_heat_map < 0] = 0
+                #self.heat_map[self.heat_map < np.max(self.heat_map)] = 0
+                #heat_map_to_draw = np.copy(self.track_heat_map)
+                #heat_map_to_draw [heat_map_to_draw < 5.0] = 0
+                labels = label(self.heat_map)
+                draw_bounding_boxes_from_labels(orig_frame, labels)
+                # add new heatmap to queue
+                #self.heat_map[self.heat_map > 0] = 1.0
+                #self.add_heat_map_to_queue(self.heat_map)
+
             if save_video:
                 out.write(orig_frame)
             # show image
             if debug:
                 cv2.imshow('Frame', orig_frame)
-                if cv2.waitKey(25) & 0xFF == ord('q'):
+                if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
-                cv2.imshow('heatmap', self.heat_map)
-                if cv2.waitKey(25) & 0xFF == ord('q'):
-                    break
+#                 cv2.imshow('Orig Frame', orig_frame)
+#                 if cv2.waitKey(1) & 0xFF == ord('q'):
+#                     break
+
+#                 if cv2.waitKey(0) & 0xFF == ord('s'):
+#                     cv2.imwrite("test_img/test%s.png"%frame_count, orig_frame)
+#                     frame_count += 1
+
+#                 if self.heat_map is not None:
+#                     cv2.imshow('heatmap', self.heat_map)
+#                     if cv2.waitKey(1) & 0xFF == ord('q'):
+#                         break
             count += 1
         if save_video:
             out.release()
         cap.release()
 
 if __name__ == "__main__":
-    pipeline = VehicleDetectionPipeline('./svc_model.pkl', './svc_scaler.pkl')
+    pipeline = VehicleDetectionPipeline('models/svc_model_C_0_0_1_new.pkl', 'models/svc_scaler_rbf_C_0_0_1_new.pkl')
     pipeline.run('../project_video.mp4', save_video=True, debug=False)
+
+
 
