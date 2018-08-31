@@ -93,6 +93,7 @@ def bin_spatial(img, size=(32,32)):
         Rresize and ravel images into 1d array as features
     """
     # resize image and unpack features onto 1d array
+    #print(img.shape)
     features = cv2.resize(img, size).ravel()
     return features
 
@@ -197,7 +198,7 @@ def slide_windows_and_update_heat_map(img, ystart,
             prediction = svc.predict(all_features)
             decision = svc.decision_function(all_features)
             if (prediction == 1) and (decision > 0.5):
-                print("Decision: %.2f" % decision)
+                #print("Decision: %.2f" % decision)
                 window_draw = np.int(window_size * scale)
                 x_draw = np.int(xleft * scale)
                 y_draw = np.int(ytop * scale)
@@ -207,7 +208,8 @@ def slide_windows_and_update_heat_map(img, ystart,
                 y2 = y_draw+window_draw+ystart
                 bboxes.append(((x1, y1),(x2, y2)))
                 cv2.rectangle(img, (x1, y1),(x2, y2), (0,255,0), 10)
-                #print(x1,x2,y1,y2)
+                #print("params:",x1,x2,y1,y2)
+                #print(heat_map.shape)
                 heat_map[y1:y2, x1:x2] += 1
     # apply threshold for heat map here
     #heat_map[heat_map <= threshold] = 0
