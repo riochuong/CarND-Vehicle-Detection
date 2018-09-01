@@ -4,7 +4,7 @@ import cv2
 import matplotlib.image as mpimg
 import numpy as np
 from scipy.ndimage.measurements import label
-
+CAR_CLASS_ID = 2
 def get_hog_features(img, orient, pix_per_cell, cell_per_block,
                         vis=False, feature_vec=True, hog_channel=3):
     # return with two outputs vis==True
@@ -233,4 +233,58 @@ def draw_bounding_boxes_from_labels(img, labels, area_threshold=2000):
         if bbox_area > area_threshold:
             cv2.rectangle(img, bbox[0], bbox[1], (0,255,0), 10)
     return img
+
+def getOutputLayersYoloV3(model):
+    # output layers is the layer that is not connected to any next layer
+    layer_names = model.getLayerNames()
+    # there are multiple output layers in the YOVOV3 so we tried to get all of them here 
+    # so we can check for all the detections
+    output_layers = [layer_names[i[0] - 1] for i in model.getUnconnectedOutLayers()]
+    return output_layers
+
+def process_each_frame_yolov3(frame, model, ystart, ystop, confidence_threshold, heat_map, width=416, height=416):
+    # create a input blob from frame
+    print(frame[ystart:ystop,:].shape, width, height)
+    blob = cv2.dnn.blobFromImage(frame[ystart:ystop,:], 1/255, (width, height), [0,0,0], 1, crop=False)
+    
+    # run model through input
+    model.setInput(blob)
+    # get all the layers from models
+    output_layers = getOutputLayersYoloV3(model)
+    print(output_layers)
+    results = model.forward(output_layers)
+    # process each outputs which is a long tensor 
+    # which first 4 elements are bounding boxes position
+    # the scores for each classes are from 5th elements
+    frame_width = frame.shape[1]
+    frame_height = ystop - ystart
+    bboxes = []
+    for result in results:
+        for detection in result:
+            # go through each detection
+            #for detection in result:
+            scores = detection[5:]
+            classId = np.argmax(scores)
+            confidence = scores[classId]
+            # only detect cars for now
+            if classId != 2 or confidence < confidence_threshold:
+                continue
+            print("Class Id: %d" % classId)
+            print("Confidence: %.2f" % confidence)
+            # now we have a car detected. need to draw the bounding box
+            # first rescale the bounding box
+            center_x = int(detection[0] * frame_width)
+            center_y = int(detection[1] * frame_height)
+            box_width = int(detection[2] * frame_width)
+            box_height = int(detection[3] * frame_height)
+            x1 = int(center_x - box_width / 2)
+            y1 = int(center_y - box_height / 2) + ystart
+            x2 = int(center_x + box_width / 2)
+            y2 = int(center_y + box_height / 2) + ystart
+            bboxes.append(((x1, y1),(x2,y2)))
+            heat_map[y1:y2,x1:x2] += 1
+    return heat_map
+    
+    
+
 

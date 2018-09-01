@@ -15,7 +15,7 @@ class VehicleDetectionPipeline(object):
                  cell_per_step=2,
                  threshold=4.5,
                  spatial_size=(32,32)):
-        self.svc_model = None
+        self.model = None
         self.scaler = None
         assert(os.path.exists(model_file))
         assert(os.path.exists(scaler_file))
